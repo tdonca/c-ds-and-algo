@@ -4,16 +4,21 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include <"circular_buffer.h">
-
-// TODO: where to update active_size?
-// TODO: where to update is_full?
+// TODO: remove explicit path dependency when switching to CMake
+#include "include/circular_buffer.h"
 
 static int buffer[BUFFER_SIZE]; 
 static bool is_full;
 static int active_size;
 static int head;
 static int tail;
+
+static void MoveTail(void) {
+    // only move the tail index when the buffer is not empty
+    if (tail != head || is_full) {
+        tail++;
+    }
+}
 
 static void MoveHead(void) {
     // adjust the tail index when overwriting in a full buffer
@@ -26,13 +31,6 @@ static void MoveHead(void) {
     head++;
     if (head == BUFFER_SIZE) {
         head = 0;
-    }
-}
-
-static void MoveTail(void) {
-    // only move the tail index when the buffer is not empty
-    if (tail != head || is_full) {
-        tail++;
     }
 }
 
@@ -52,7 +50,7 @@ int ReadTail(void) {
     // update the tail pointer, handling wrap-around
     // return the data from the tail index
     int value = buffer[tail];
-    MoveIndex(tail);
+    MoveTail();
 
     //TODO: how to handle someone calling read() on empty buffer?
     active_size--;
@@ -83,7 +81,16 @@ int main(void) {
 
     // verify the data was saved with wrap-around
     assert(buffer[0] == BUFFER_SIZE);
+    printf("Buffer[0]: %d\n", buffer[0]);
     assert(buffer[127] == BUFFER_SIZE - 1);
+    printf("Buffer[127]: %d\n", buffer[127]);
+    assert(IsEmpty() == false);
+    assert(is_full == true);
+    int tailElem = ReadTail(); 
+    printf("Read tail: %d\n", tailElem);
+    assert(tailElem == 50);
+    assert(is_full == false);
+
 
     return EXIT_SUCCESS;
 }

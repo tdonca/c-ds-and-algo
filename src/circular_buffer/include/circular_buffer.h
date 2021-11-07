@@ -1,6 +1,8 @@
 #ifndef CIRCULAR_BUFFER_H_
 #define CIRCULAR_BUFFER_H_
 
+#include <stdbool.h>
+
 #define BUFFER_SIZE 128
 
 // Writes a given value to the front of the circular buffer, 
@@ -15,6 +17,7 @@ void WriteHead(int value);
 // Output: the oldest int value in a non-empty buffer.
 int ReadTail(void);
 
+// Checks whether the buffer is empty
 bool IsEmpty(void);
 
 // Empties the buffer and its contents
