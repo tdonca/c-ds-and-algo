@@ -4,93 +4,158 @@
 #include <stdbool.h>
 #include <string.h>
 
-// TODO: remove explicit path dependency when switching to CMake
+// TODO: Remove explicit path dependency when switching to CMake
 #include "include/circular_buffer.h"
 
-static int buffer[BUFFER_SIZE]; 
-static bool is_full;
-static int active_size;
-static int head;
-static int tail;
+// TODO: Should this be static?
+struct circular_buffer_t {
+    int* buffer; // underlying array, provided by the user during init
+    size_t max; // size of underlying array
+    size_t head; // size type for array index of latest buffer element
+    size_t tail; // size type for array index of earliest buffer element
+    bool is_full;
+};
 
-static void MoveTail(void) {
-    // only move the tail index when the buffer is not empty
-    if (tail != head || is_full) {
-        tail++;
+//TODO: Add description
+static void move_head(circbuf_handle_t circbuf);
+
+// TODO: Add description
+static void move_tail(circbuf_handle_t circbuf);
+
+/*-----------------------------------------------*/
+
+static void move_head(circbuf_handle_t circbuf) {
+    // Also move the tail up if the buffer is full 
+    if (circbuf->is_full) {
+        move_tail(circbuf);
+    }
+
+    circbuf->head++;
+
+    // Handle array wrap-around
+    if (circbuf->head == circbuf->max) {
+        circbuf->head = 0;
     }
 }
 
-static void MoveHead(void) {
-    // adjust the tail index when overwriting in a full buffer
-    // the oldest value in the buffer is lost
-    if (is_full) {
-        MoveTail();
-    }
+static void move_tail(circbuf_handle_t circbuf) {
+    circbuf->tail++;
 
-    // handle wrap-around
-    head++;
-    if (head == BUFFER_SIZE) {
-        head = 0;
+    // Handle array wrap-around
+    if (circbuf->tail == circbuf->max) {
+        circbuf->tail = 0;
     }
 }
 
-void WriteHead(int value) {
-    // write to the next available index 
-    // update the head pointer, handling wrap-around
-    buffer[head] = value;
-    MoveHead();
+/*-----------------------------------------------*/
 
-    if (!is_full) {
-        active_size++;
-        is_full = (active_size == BUFFER_SIZE);
+circbuf_handle_t circbuf_init(int* buffer, size_t size) {
+    assert(buffer != NULL);
+    assert(size > 0);
+
+    // Dynamically allocate an instance of the circular buffer struct
+    circbuf_handle_t handle = malloc(sizeof(circular_buffer_t));
+    assert(handle != NULL);
+
+    handle->buffer = buffer;
+    handle->max = size;
+    circbuf_reset(handle);
+    assert(circbuf_is_empty(handle));
+
+    return handle; 
+}
+
+void circbuf_reset(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+
+    // Clear the provided buffer array
+    memset(circbuf->buffer, 0, circbuf->max);
+
+    // Reset the head and tail pointers
+    circbuf->head = 0;
+    circbuf->tail = 0;
+    circbuf->is_full = false;
+}
+
+void circbuf_free(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    free(circbuf);
+}
+
+bool circbuf_is_full(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    return circbuf->is_full;
+}
+
+bool circbuf_is_empty(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    return (circbuf->tail == circbuf->head) && !circbuf->is_full;
+}
+
+size_t circbuf_size(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    int size = 0;
+
+    // The size of a full buffer is the max capacity
+    if (circbuf->is_full) {
+        size = circbuf->max;
+
+    // If both head and tail point to the same index and the buffer isn't full
+    // Then the buffer is empty
+    } else if (circbuf->tail == circbuf->head) {
+        size = 0;
+
+    // Compute the size based on the head and tail, handling wrap-around
+    } else {
+
+        // No wrap-around
+        if (circbuf->tail < circbuf->head) {
+            size = circbuf->head - circbuf->tail; 
+        
+        // Handle wrap-around
+        } else {
+            size = (circbuf->max - circbuf->tail) + circbuf->head;
+        }
+    }
+
+    return size;
+}
+
+size_t circbuf_capacity(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    return circbuf->max;
+}
+
+void circbuf_write_head(circbuf_handle_t circbuf, int value) {
+    assert(circbuf != NULL);
+    
+    // Write the value
+    circbuf->buffer[circbuf->head] = value;
+    
+    // Update the head and tail
+    // Overwrite the tail element if the buffer was full
+    move_head(circbuf);
+    
+    // Update full status
+    // The buffer is now necessarily not empty, but it could have just become full
+    if (circbuf->head == circbuf->tail) {
+        circbuf->is_full = true;
     }
 }
 
-int ReadTail(void) {
-    // update the tail pointer, handling wrap-around
-    // return the data from the tail index
-    int value = buffer[tail];
-    MoveTail();
+int circbuf_read_tail(circbuf_handle_t circbuf) {
+    assert(circbuf != NULL);
+    assert(!circbuf_is_empty(circbuf));
 
-    //TODO: how to handle someone calling read() on empty buffer?
-    active_size--;
-    is_full = (active_size == BUFFER_SIZE);
+    // Read the value
+    int value = circbuf->buffer[circbuf->tail];
+
+    // Update the pointers
+    move_tail(circbuf);
+
+    // Update full status
+    // The buffer is now necessarily not full, since we just decreased it by one element
+    circbuf->is_full = false;
 
     return value;
-}
-
-bool IsEmpty() {
-    return (head == tail && !is_full);
-}
-
-void ClearBuffer(void) {
-    // set all values in the buffer array to 0
-    // reset the head and tail pointers
-    head = 0;
-    tail = 0;
-    is_full = false;
-    active_size = 0;
-    memset(buffer, 0, sizeof(buffer));
-}
-
-int main(void) {
-    // add data to the buffer, past the wrap-around point
-    for (int i = 0; i < BUFFER_SIZE + 50; i++) {
-        WriteHead(i);
-    }
-
-    // verify the data was saved with wrap-around
-    assert(buffer[0] == BUFFER_SIZE);
-    printf("Buffer[0]: %d\n", buffer[0]);
-    assert(buffer[127] == BUFFER_SIZE - 1);
-    printf("Buffer[127]: %d\n", buffer[127]);
-    assert(IsEmpty() == false);
-    assert(is_full == true);
-    int tailElem = ReadTail(); 
-    printf("Read tail: %d\n", tailElem);
-    assert(tailElem == 50);
-    assert(is_full == false);
-
-
-    return EXIT_SUCCESS;
 }
