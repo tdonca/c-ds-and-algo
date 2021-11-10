@@ -1,7 +1,7 @@
 
 // TODO: switch to CMake and clean this up
-#include "../../../Unity/src/unity.h"
-#include "../../src/circular_buffer/include/circular_buffer.h"
+#include "unity.h"
+#include "circular_buffer.h"
 
 void setUp(void) {
 
