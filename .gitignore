@@ -1,1 +1,5 @@
 .vscode/
+
+# Ignore CMake artifacts
+build/
+install/
