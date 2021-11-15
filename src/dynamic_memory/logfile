@@ -1,0 +1,8 @@
+1637012381: 3: Dmalloc version '5.6.5' from 'http://dmalloc.com/'
+1637012381: 3: flags = 0x4e48503, logfile 'logfile'
+1637012381: 3: interval = 100, addr = 0x0, seen # = 0, limit = 0
+1637012381: 3: starting time = 1637012381
+1637012381: 3: process pid = 153527
+1637012381: 3:   error details: finding address in heap
+1637012381: 3:   pointer '0x7fc3dd377f88' from 'caesar.c:22' prev access 'unknown'
+1637012381: 3: ERROR: free: tried to free previously freed pointer (err 61)
